@@ -34,6 +34,19 @@ Context: {context}
                 "temperature": settings.TEMPERATURE_INFERENCE,
             },
         )
-        answer = self.llm.inference()[0]["generated_text"]
+        result = self.llm.inference()
+
+        if isinstance(result, list):
+            first = result[0]
+            answer = first.get("generated_text") if isinstance(first, dict) else first
+        elif isinstance(result, dict):
+            output = result.get("output") or result
+            if isinstance(output, list):
+                first = output[0]
+                answer = first.get("generated_text") if isinstance(first, dict) else first
+            else:
+                answer = output
+        else:
+            answer = str(result)
 
         return answer
