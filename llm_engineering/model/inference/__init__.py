@@ -1,4 +1,4 @@
-from .inference import LLMInferenceSagemakerEndpoint
+from .inference import LLMInferenceAzureEndpoint
 from .run import InferenceExecutor
 
-__all__ = ["LLMInferenceSagemakerEndpoint", "InferenceExecutor"]
+__all__ = ["LLMInferenceAzureEndpoint", "InferenceExecutor"]
