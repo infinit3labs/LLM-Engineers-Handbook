@@ -1,40 +1,62 @@
 import json
 from typing import Any, Dict, Optional
 
+import requests
+from azure.ai.ml import MLClient
+from azure.identity import DefaultAzureCredential
 from loguru import logger
-
-try:
-    import boto3
-except ModuleNotFoundError:
-    logger.warning("Couldn't load AWS or SageMaker imports. Run 'poetry install --with aws' to support AWS.")
-
 
 from llm_engineering.domain.inference import Inference
 from llm_engineering.settings import settings
 
 
-class LLMInferenceSagemakerEndpoint(Inference):
+def _build_ml_client() -> MLClient:
+    required_settings = {
+        "AZURE_SUBSCRIPTION_ID": settings.AZURE_SUBSCRIPTION_ID,
+        "AZURE_RESOURCE_GROUP": settings.AZURE_RESOURCE_GROUP,
+        "AZURE_ML_WORKSPACE": settings.AZURE_ML_WORKSPACE,
+    }
+    missing = [key for key, value in required_settings.items() if not value]
+    if missing:
+        raise ValueError(f"Missing Azure ML settings: {', '.join(missing)}")
+
+    credential = DefaultAzureCredential()
+    return MLClient(
+        credential=credential,
+        subscription_id=settings.AZURE_SUBSCRIPTION_ID,  # type: ignore[arg-type]
+        resource_group_name=settings.AZURE_RESOURCE_GROUP,  # type: ignore[arg-type]
+        workspace_name=settings.AZURE_ML_WORKSPACE,  # type: ignore[arg-type]
+    )
+
+
+class LLMInferenceAzureEndpoint(Inference):
     """
-    Class for performing inference using a SageMaker endpoint for LLM schemas.
+    Perform inference against an Azure ML managed online endpoint.
     """
 
     def __init__(
         self,
         endpoint_name: str,
         default_payload: Optional[Dict[str, Any]] = None,
-        inference_component_name: Optional[str] = None,
+        deployment_name: Optional[str] = None,
     ) -> None:
         super().__init__()
 
-        self.client = boto3.client(
-            "sagemaker-runtime",
-            region_name=settings.AWS_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY,
-            aws_secret_access_key=settings.AWS_SECRET_KEY,
-        )
         self.endpoint_name = endpoint_name
+        self.deployment_name = deployment_name or settings.AZURE_DEPLOYMENT_NAME
         self.payload = default_payload if default_payload else self._default_payload()
-        self.inference_component_name = inference_component_name
+
+        self.ml_client = _build_ml_client()
+        endpoint = self.ml_client.online_endpoints.get(name=self.endpoint_name)
+        keys = self.ml_client.online_endpoints.get_keys(name=self.endpoint_name)
+
+        self.scoring_uri = endpoint.scoring_uri
+        self.api_key = keys.primary_key
+
+        if not self.scoring_uri or not self.api_key:
+            raise ValueError(
+                "Azure ML endpoint is missing scoring URI or access key. Ensure the endpoint is deployed."
+            )
 
     def _default_payload(self) -> Dict[str, Any]:
         """
@@ -45,13 +67,14 @@ class LLMInferenceSagemakerEndpoint(Inference):
         """
 
         return {
-            "inputs": "How is the weather?",
-            "parameters": {
-                "max_new_tokens": settings.MAX_NEW_TOKENS_INFERENCE,
-                "top_p": settings.TOP_P_INFERENCE,
-                "temperature": settings.TEMPERATURE_INFERENCE,
-                "return_full_text": False,
-            },
+            "input_data": {
+                "input_string": ["How is the weather?"],
+                "parameters": {
+                    "max_new_tokens": settings.MAX_NEW_TOKENS_INFERENCE,
+                    "top_p": settings.TOP_P_INFERENCE,
+                    "temperature": settings.TEMPERATURE_INFERENCE,
+                },
+            }
         }
 
     def set_payload(self, inputs: str, parameters: Optional[Dict[str, Any]] = None) -> None:
@@ -63,13 +86,13 @@ class LLMInferenceSagemakerEndpoint(Inference):
             parameters (dict, optional): Additional parameters for the inference. Defaults to None.
         """
 
-        self.payload["inputs"] = inputs
+        self.payload["input_data"]["input_string"] = [inputs]
         if parameters:
-            self.payload["parameters"].update(parameters)
+            self.payload["input_data"]["parameters"].update(parameters)
 
     def inference(self) -> Dict[str, Any]:
         """
-        Performs the inference request using the SageMaker endpoint.
+        Performs the inference request using the Azure ML endpoint.
 
         Returns:
             dict: The response from the inference request.
@@ -77,21 +100,23 @@ class LLMInferenceSagemakerEndpoint(Inference):
             Exception: If an error occurs during the inference request.
         """
 
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
+        if self.deployment_name:
+            headers["azureml-model-deployment"] = self.deployment_name
+
         try:
-            logger.info("Inference request sent.")
-            invoke_args = {
-                "EndpointName": self.endpoint_name,
-                "ContentType": "application/json",
-                "Body": json.dumps(self.payload),
-            }
-            if self.inference_component_name not in ["None", None]:
-                invoke_args["InferenceComponentName"] = self.inference_component_name
-            response = self.client.invoke_endpoint(**invoke_args)
-            response_body = response["Body"].read().decode("utf8")
-
-            return json.loads(response_body)
-
+            logger.info("Sending inference request to Azure ML endpoint.")
+            response = requests.post(
+                self.scoring_uri,
+                headers=headers,
+                data=json.dumps(self.payload),
+                timeout=60,
+            )
+            response.raise_for_status()
+            return response.json()
         except Exception:
-            logger.exception("SageMaker inference failed.")
-
+            logger.exception("Azure ML inference failed.")
             raise

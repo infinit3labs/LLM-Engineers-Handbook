@@ -25,7 +25,7 @@ The goal of this book is to create your own end-to-end LLM-based system using be
 - 📝 Data collection & generation
 - 🔄 LLM training pipeline
 - 📊 Simple RAG system
-- 🚀 Production-ready AWS deployment
+- 🚀 Production-ready Azure deployment
 - 🔍 Comprehensive monitoring
 - 🧪 Testing and evaluation framework
 
@@ -46,7 +46,7 @@ To install and run the project locally, you need the following dependencies.
 | Python | 3.11 | Runtime environment | [Download](https://www.python.org/downloads/) |
 | Poetry | >= 1.8.3 and < 2.0 | Package management | [Install Guide](https://python-poetry.org/docs/#installation) |
 | Docker | ≥27.1.1 | Containerization | [Install Guide](https://docs.docker.com/engine/install/) |
-| AWS CLI | ≥2.15.42 | Cloud management | [Install Guide](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) |
+| Azure CLI | ≥2.60.0 | Cloud management | [Install Guide](https://learn.microsoft.com/cli/azure/install-azure-cli) |
 | Git | ≥2.44.0 | Version control | [Download](https://git-scm.com/downloads) |
 
 ### Cloud services
@@ -59,7 +59,7 @@ The code also uses and depends on the following cloud services. For now, you don
 | [Comet ML](https://www.comet.com/site/products/opik/?utm_source=llm_handbook&utm_medium=github&utm_campaign=opik) | Experiment tracker |
 | [Opik](https://www.comet.com/site/products/opik/?utm_source=llm_handbook&utm_medium=github&utm_campaign=opik) | Prompt monitoring |
 | [ZenML](https://www.zenml.io/) | Orchestrator and artifacts layer |
-| [AWS](https://aws.amazon.com/) | Compute and storage |
+| [Azure](https://azure.microsoft.com/) | Compute and storage |
 | [MongoDB](https://www.mongodb.com/) | NoSQL database |
 | [Qdrant](https://qdrant.tech/) | Vector database |
 | [GitHub Actions](https://github.com/features/actions) | CI/CD pipeline |
@@ -94,7 +94,7 @@ Here is the directory overview:
 - `domain/`: Core business entities and structures
 - `application/`: Business logic, crawlers, and RAG implementation
 - `model/`: LLM training and inference
-- `infrastructure/`: External service integrations (AWS, Qdrant, MongoDB, FastAPI)
+- `infrastructure/`: External service integrations (Azure, Qdrant, MongoDB, FastAPI)
 
 The code logic and imports flow as follows: `infrastructure` → `model` → `application` → `domain`
 
@@ -193,7 +193,7 @@ poetry run pre-commit install
 This will:
 
 - Configure Poetry to use Python 3.11
-- Install project dependencies (excluding AWS-specific packages)
+- Install project dependencies (excluding cloud-specific packages)
 - Set up pre-commit hooks for code verification
 
 ### 4. Activate the Environment
@@ -280,7 +280,7 @@ COMET_API_KEY=your_api_key_here
 
 ### 6. Deployment Setup
 
-When deploying the project to the cloud, we must set additional settings for Mongo, Qdrant, and AWS. If you are just working locally, the default values of these env vars will work out of the box. Detailed deployment instructions are available in Chapter 11 of the [LLM Engineer's Handbook](https://www.amazon.com/LLM-Engineers-Handbook-engineering-production/dp/1836200072/).
+When deploying the project to the cloud, we must set additional settings for Mongo, Qdrant, and Azure. If you are just working locally, the default values of these env vars will work out of the box. Detailed deployment instructions are available in Chapter 11 of the [LLM Engineer's Handbook](https://www.amazon.com/LLM-Engineers-Handbook-engineering-production/dp/1836200072/).
 
 #### MongoDB
 
@@ -304,23 +304,22 @@ QDRANT_APIKEY=your_qdrant_api_key
 
 → Check out this [tutorial](https://qdrant.tech/documentation/cloud/create-cluster/) to learn how to create a Qdrant cluster for free
 
-#### AWS
+#### Azure
 
-For your AWS set-up to work correctly, you need the AWS CLI installed on your local machine and properly configured with an admin user (or a user with enough permissions to create new SageMaker, ECR, and S3 resources; using an admin user will make everything more straightforward).
-
-Chapter 2 provides step-by-step instructions on how to install the AWS CLI, create an admin user on AWS, and get an access key to set up the `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` environment variables. If you already have an AWS admin user in place, you have to configure the following env vars in your `.env` file:
+To deploy the project to Azure you need the Azure CLI installed and logged in to a subscription that has access to an Azure ML workspace. Configure the following environment variables in your `.env` file:
 
 ```bash
-AWS_REGION=eu-central-1 # Change it with your AWS region.
-AWS_ACCESS_KEY=your_aws_access_key
-AWS_SECRET_KEY=your_aws_secret_key
+AZURE_SUBSCRIPTION_ID=your_subscription_id
+AZURE_RESOURCE_GROUP=your_resource_group
+AZURE_ML_WORKSPACE=your_workspace_name
+AZURE_ENDPOINT_NAME=twin
+AZURE_DEPLOYMENT_NAME=blue
+AZURE_INSTANCE_TYPE=Standard_DS3_v2   # or a GPU SKU for larger models
+AZURE_INSTANCE_COUNT=1
+AZURE_COMPUTE_TARGET=cpu-cluster      # compute target for training/evaluation jobs
 ```
 
-AWS credentials are typically stored in `~/.aws/credentials`. You can view this file directly using `cat` or similar commands:
-
-```bash
-cat ~/.aws/credentials
-```
+Use `az account show` to verify you are logged into the correct subscription. Endpoint authentication uses managed keys generated by Azure ML; the deployment helper scripts will fetch them automatically.
 
 > [!IMPORTANT]
 > Additional configuration options are available in [settings.py](https://github.com/PacktPublishing/LLM-Engineers-Handbook/blob/main/llm_engineering/settings.py). Any variable in the `Settings` class can be configured through the `.env` file. 
@@ -356,7 +355,7 @@ poetry poe run-inference-ml-service
 ```
 
 > [!IMPORTANT]
-> The LLM microservice, called by the RESTful API, will work only after deploying the LLM to AWS SageMaker.
+> The LLM microservice, called by the RESTful API, will work only after deploying the LLM to Azure ML.
 
 #### ZenML
 
@@ -391,37 +390,16 @@ Default credentials:
 You can search your MongoDB collections using your **IDEs MongoDB plugin** (which you have to install separately), where you have to use the database URI to connect to the MongoDB database hosted within the Docker container: `mongodb://llm_engineering:llm_engineering@127.0.0.1:27017`
 
 > [!IMPORTANT]
-> Everything related to training or running the LLMs (e.g., training, evaluation, inference) can only be run if you set up AWS SageMaker, as explained in the next section on cloud infrastructure.
+> Everything related to training or running the LLMs (e.g., training, evaluation, inference) relies on having the Azure ML workspace and credentials configured as described above.
 
 ### Cloud infrastructure (for production)
 
-Here we will quickly present how to deploy the project to AWS and other serverless services. We won't go into the details (as everything is presented in the book) but only point out the main steps you have to go through.
+Here we will quickly present how to deploy the project to Azure. We won't go into the details (as everything is presented in the book) but only point out the main steps you have to go through.
 
-First, reinstall your Python dependencies with the AWS group:
+First, reinstall your Python dependencies with the Azure group:
 ```bash
-poetry install --with aws
+poetry install --with azure
 ```
-
-#### AWS SageMaker
-
-> [!NOTE]
-> Chapter 10 provides step-by-step instructions in the section "Implementing the LLM microservice using AWS SageMaker".
-
-By this point, we expect you to have AWS CLI installed and your AWS CLI and project's env vars (within the `.env` file) properly configured with an AWS admin user.
-
-To ensure best practices, we must create a new AWS user restricted to creating and deleting only resources related to AWS SageMaker. Create it by running:
-```bash
-poetry poe create-sagemaker-role
-```
-It will create a `sagemaker_user_credentials.json` file at the root of your repository with your new `AWS_ACCESS_KEY` and `AWS_SECRET_KEY` values. **But before replacing your new AWS credentials, also run the following command to create the execution role (to create it using your admin credentials).**
-
-To create the IAM execution role used by AWS SageMaker to access other AWS resources on our behalf, run the following:
-```bash
-poetry poe create-sagemaker-execution-role
-```
-It will create a `sagemaker_execution_role.json` file at the root of your repository with your new `AWS_ARN_ROLE` value. Add it to your `.env` file. 
-
-Once you've updated the `AWS_ACCESS_KEY`, `AWS_SECRET_KEY`, and `AWS_ARN_ROLE` values in your `.env` file, you can use AWS SageMaker. **Note that this step is crucial to complete the AWS setup.**
 
 #### Training
 
@@ -429,32 +407,38 @@ We start the training pipeline through ZenML by running the following:
 ```bash
 poetry poe run-training-pipeline
 ```
-This will start the training code using the configs from `configs/training.yaml` directly in SageMaker. You can visualize the results in Comet ML's dashboard.
+This will start the training code using the configs from `configs/training.yaml`. You can visualize the results in Comet ML's dashboard.
 
 We start the evaluation pipeline through ZenML by running the following:
 ```bash
 poetry poe run-evaluation-pipeline
 ```
-This will start the evaluation code using the configs from `configs/evaluating.yaml` directly in SageMaker. You can visualize the results in `*-results` datasets saved to your Hugging Face profile.
+This will start the evaluation code using the configs from `configs/evaluating.yaml`. You can visualize the results in `*-results` datasets saved to your Hugging Face profile.
+
+To offload training or evaluation to Azure ML directly, you can run the helper scripts:
+```bash
+poetry run python -m llm_engineering.model.finetuning.azure_ml
+poetry run python -m llm_engineering.model.evaluation.azure_ml
+```
 
 #### Inference
 
-To create an AWS SageMaker Inference Endpoint, run:
+To create an Azure ML managed online endpoint, run:
 ```bash
 poetry poe deploy-inference-endpoint
 ```
 To test it out, run:
 ```bash
-poetry poe test-sagemaker-endpoint
+poetry poe test-inference-endpoint
 ```
 To delete it, run:
 ```bash
 poetry poe delete-inference-endpoint
 ```
 
-#### AWS: ML pipelines, artifacts, and containers
+#### Azure: ML pipelines, artifacts, and containers
 
-The ML pipelines, artifacts, and containers are deployed to AWS by leveraging ZenML's deployment features. Thus, you must create an account with ZenML Cloud and follow their guide on deploying a ZenML stack to AWS. Otherwise, we provide step-by-step instructions in **Chapter 11**, section **Deploying the LLM Twin's pipelines to the cloud** on what you must do.  
+The ML pipelines, artifacts, and containers can be deployed to Azure by leveraging ZenML's deployment features. Configure a ZenML stack that targets Azure compute and storage and update the `set-azure-stack` task accordingly. Detailed steps are provided in **Chapter 11**, section **Deploying the LLM Twin's pipelines to the cloud**.
 
 #### Qdrant & MongoDB
 
@@ -463,10 +447,12 @@ We leverage Qdrant's and MongoDB's serverless options when deploying the project
 #### GitHub Actions
 
 We use GitHub Actions to implement our CI/CD pipelines. To implement your own, you have to fork our repository and set the following env vars as Actions secrets in your forked repository:
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
-- `AWS_ECR_NAME`
-- `AWS_REGION`
+- `AZURE_SUBSCRIPTION_ID`
+- `AZURE_RESOURCE_GROUP`
+- `AZURE_ML_WORKSPACE`
+- `AZURE_CLIENT_ID`
+- `AZURE_CLIENT_SECRET`
+- `AZURE_TENANT_ID`
 
 Also, we provide instructions on how to set everything up in **Chapter 11**, section **Adding LLMOps to the LLM Twin**.
 
@@ -478,7 +464,7 @@ You can visualize the results on their self-hosted dashboards if you create a Co
 
 ### 💰 Running the Project Costs
 
-We will mostly stick to free tiers for all the services except for AWS and OpenAI's API, which are both pay-as-you-go services. The cost of running the project once, with our default values, will be roughly ~$25 (most of it comes from using AWS SageMaker for training and inference).
+We will mostly stick to free tiers for all the services except for Azure and OpenAI's API, which are both pay-as-you-go services. Keep Azure ML endpoints stopped when not in use and prefer CPU SKUs for experimentation to minimize costs.
 
 ## ⚡ Pipelines
 
@@ -569,7 +555,7 @@ poetry poe run-evaluation-pipeline
 ```
 
 > [!WARNING]
-> For this to work, make sure you properly configured AWS SageMaker as described in [Set up cloud infrastructure (for production)](#set-up-cloud-infrastructure-for-production).
+> For this to work, make sure you properly configured Azure ML as described in [Set up cloud infrastructure (for production)](#set-up-cloud-infrastructure-for-production).
 
 ### Inference pipelines
 
@@ -591,7 +577,7 @@ poetry poe call-inference-ml-service
 Remember that you can monitor the prompt traces on [Opik](https://www.comet.com/opik).
 
 > [!WARNING]
-> For the inference service to work, you must have the LLM microservice deployed to AWS SageMaker, as explained in the setup cloud infrastructure section.
+> For the inference service to work, you must have the LLM microservice deployed to Azure ML, as explained in the setup cloud infrastructure section.
 
 ### Linting & formatting (QA)
 
@@ -636,7 +622,7 @@ Based on the setup and usage steps described above, assuming the local and cloud
 ### Training
 
 > [!IMPORTANT]
-> From now on, for these steps to work, you need to properly set up AWS SageMaker, such as running `poetry install --with aws` and filling in the AWS-related environment variables and configs.
+> From now on, for these steps to work, you need to properly set up Azure ML, such as running `poetry install --with azure` and filling in the Azure-related environment variables and configs.
 
 5. SFT fine-tuning Llamma 3.1: `poetry poe run-training-pipeline`
 
@@ -647,13 +633,13 @@ Based on the setup and usage steps described above, assuming the local and cloud
 ### Inference
 
 > [!IMPORTANT]
-> From now on, for these steps to work, you need to properly set up AWS SageMaker, such as running `poetry install --with aws` and filling in the AWS-related environment variables and configs.
+> From now on, for these steps to work, you need to properly set up Azure ML, such as running `poetry install --with azure` and filling in the Azure-related environment variables and configs.
 
 8. Call only the RAG retrieval module: `poetry poe call-rag-retrieval-module`
 
-9. Deploy the LLM Twin microservice to SageMaker: `poetry poe deploy-inference-endpoint`
+9. Deploy the LLM Twin microservice to Azure ML: `poetry poe deploy-inference-endpoint`
 
-10. Test the LLM Twin microservice: `poetry poe test-sagemaker-endpoint`
+10. Test the LLM Twin microservice: `poetry poe test-inference-endpoint`
 
 11. Start end-to-end RAG server: `poetry poe run-inference-ml-service`
 

@@ -34,18 +34,23 @@ class Settings(BaseSettings):
     QDRANT_CLOUD_URL: str = "str"
     QDRANT_APIKEY: str | None = None
 
-    # AWS Authentication
-    AWS_REGION: str = "eu-central-1"
-    AWS_ACCESS_KEY: str | None = None
-    AWS_SECRET_KEY: str | None = None
-    AWS_ARN_ROLE: str | None = None
+    # Azure Authentication
+    AZURE_SUBSCRIPTION_ID: str | None = None
+    AZURE_RESOURCE_GROUP: str | None = None
+    AZURE_ML_WORKSPACE: str | None = None
+    AZURE_TENANT_ID: str | None = None
+    AZURE_CLIENT_ID: str | None = None
+    AZURE_CLIENT_SECRET: str | None = None
 
     # --- Optional settings used to tweak the code. ---
 
-    # AWS SageMaker
+    # Azure AI / Azure ML
     HF_MODEL_ID: str = "mlabonne/TwinLlama-3.1-8B-DPO"
-    GPU_INSTANCE_TYPE: str = "ml.g5.2xlarge"
-    SM_NUM_GPUS: int = 1
+    AZURE_ENDPOINT_NAME: str = "twin"
+    AZURE_DEPLOYMENT_NAME: str = "blue"
+    AZURE_INSTANCE_TYPE: str = "Standard_DS3_v2"
+    AZURE_INSTANCE_COUNT: int = 1
+    AZURE_COMPUTE_TARGET: str = "cpu-cluster"
     MAX_INPUT_LENGTH: int = 2048
     MAX_TOTAL_TOKENS: int = 4096
     MAX_BATCH_TOTAL_TOKENS: int = 4096
@@ -53,8 +58,6 @@ class Settings(BaseSettings):
     GPUS: int = 1  # Number of GPUs
     CPUS: int = 2  # Number of CPU cores
 
-    SAGEMAKER_ENDPOINT_CONFIG_INFERENCE: str = "twin"
-    SAGEMAKER_ENDPOINT_INFERENCE: str = "twin"
     TEMPERATURE_INFERENCE: float = 0.01
     TOP_P_INFERENCE: float = 0.9
     MAX_NEW_TOKENS_INFERENCE: int = 150
